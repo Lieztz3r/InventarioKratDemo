@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#172331">
+    <meta name="description" content="Demo de control de inventario de Krateroi: existencias, costos y rentabilidad en una sola vista.">
+    <title>Atlas · Inventario | Krateroi</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <a class="brand" href="#" aria-label="Atlas Inventario, inicio" data-go-view="resumen">
+          <span class="brand-mark">K</span>
+          <span class="brand-copy"><strong>KRATEROI</strong><small>OPERACIONES</small></span>
+        </a>
+
+        <div class="workspace-label">ESPACIO DE TRABAJO</div>
+        <div class="workspace-switch">
+          <span class="workspace-avatar">A</span>
+          <span class="workspace-name"><strong>Almacén central</strong><small>Demo · Santiago, CL</small></span>
+          <span class="workspace-chevron" aria-hidden="true">⌄</span>
+        </div>
+
+        <div class="nav-label">GESTIÓN</div>
+        <nav class="main-nav" aria-label="Navegación principal">
+          <button class="nav-link is-active" type="button" data-view="resumen"><span class="nav-icon">◫</span>Resumen</button>
+          <button class="nav-link" type="button" data-view="inventario"><span class="nav-icon">▦</span>Inventario<span class="nav-count" id="low-stock-nav">0</span></button>
+          <button class="nav-link" type="button" data-view="movimientos"><span class="nav-icon">⇄</span>Movimientos</button>
+          <button class="nav-link" type="button" data-view="economia"><span class="nav-icon">◈</span>Economía</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="help-card">
+            <span class="help-spark">✳</span>
+            <strong>Demo interactiva</strong>
+            <p>Los cambios se guardan en una base de datos SQLite local.</p>
+            <button type="button" class="text-button" data-action="reset">Restablecer datos <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="profile">
+            <span class="profile-avatar">K</span>
+            <span class="profile-copy"><strong>Equipo Krateroi</strong><small>Plan de demostración</small></span>
+            <span class="profile-more" aria-hidden="true">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <button class="mobile-menu icon-button" type="button" aria-label="Abrir menú" data-action="menu">☰</button>
+          <div class="breadcrumbs"><span>Operaciones</span><span class="crumb-slash">/</span><strong id="current-crumb">Resumen</strong></div>
+          <div class="topbar-actions">
+            <span class="demo-chip" id="server-status"><span class="pulse-dot"></span><span id="server-status-label">CONECTANDO…</span></span>
+            <span class="topbar-divider"></span>
+            <button class="icon-button notification-button" type="button" aria-label="Ver artículos con stock bajo" data-action="low-stock">♧<i id="low-stock-dot"></i></button>
+            <span class="user-avatar" aria-label="Perfil de equipo">K</span>
+          </div>
+        </header>
+
+        <div class="content-wrap">
+          <section class="connection-banner" id="connection-banner" role="alert" hidden>
+            <div><strong>La base de datos local no está disponible</strong><p id="connection-error-message">Inicia el servidor local y vuelve a intentar.</p></div>
+            <button class="button button-light" type="button" data-action="retry">Reintentar conexión</button>
+          </section>
+          <section class="view is-visible" id="view-resumen" data-view-panel="resumen">
+            <div class="page-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span>CONTROL DE INVENTARIO</div><h1>Tu operación<span class="title-period">.</span></h1><p class="page-subtitle">Una vista clara de existencias, movimiento y valor de tu operación.</p></div>
+              <div class="heading-actions"><span class="date-chip" id="today-label"></span><button class="button button-dark" type="button" data-action="new-movement"><span class="button-plus">＋</span> Registrar movimiento</button></div>
+            </div>
+
+            <div class="metric-grid">
+              <article class="metric-card metric-primary">
+                <div class="metric-top"><span>VALOR DEL INVENTARIO</span><span class="metric-icon">◈</span></div>
+                <div class="metric-value" id="metric-stock-value">$0</div>
+                <div class="metric-note"><span class="metric-accent" id="metric-retail-value">$0</span><span> valor potencial de venta</span></div>
+                <div class="metric-decoration" aria-hidden="true"></div>
+              </article>
+              <article class="metric-card">
+                <div class="metric-top"><span>VENTAS REGISTRADAS · 30 DÍAS</span><span class="metric-icon icon-terracotta">↗</span></div>
+                <div class="metric-value" id="metric-sales">$0</div>
+                <div class="metric-note"><span class="metric-accent" id="metric-units-sold">0 unidades</span><span> salida de inventario</span></div>
+                <svg class="sparkline" viewBox="0 0 120 34" role="img" aria-label="Tendencia de ventas"><path d="M2 28 C14 26 15 21 27 23 S42 27 51 17 S65 20 73 13 S84 19 94 9 S108 12 118 3"></path></svg>
+              </article>
+              <article class="metric-card">
+                <div class="metric-top"><span>MARGEN BRUTO PROMEDIO</span><span class="metric-icon icon-green">%</span></div>
+                <div class="metric-value" id="metric-margin">0%</div>
+                <div class="metric-note"><span>ponderado por ventas</span></div>
+                <div class="margin-track"><span id="margin-track"></span></div>
+              </article>
+              <article class="metric-card metric-alert">
+                <div class="metric-top"><span>REQUIEREN ATENCIÓN</span><span class="metric-icon icon-amber">!</span></div>
+                <div class="metric-value" id="metric-low-stock">0</div>
+                <div class="metric-note"><span class="metric-accent" id="metric-low-copy">Sin alertas de stock</span></div>
+                <button class="inline-link" type="button" data-action="low-stock">Revisar existencias <span aria-hidden="true">→</span></button>
+              </article>
+            </div>
+
+            <div class="dashboard-grid">
+              <section class="panel sales-panel">
+                <div class="panel-heading">
+                  <div><div class="section-kicker">RENDIMIENTO</div><h2>Ventas en el tiempo</h2></div>
+                  <span class="select-display">Últimos 6 meses <span aria-hidden="true">⌄</span></span>
+                </div>
+                <div class="chart-summary"><strong id="chart-total">$0</strong><span>ingresos registrados</span><span class="chart-period">CLP · ventas</span></div>
+                <div class="chart-wrap" id="sales-chart"></div>
+                <div class="chart-legend"><span><i></i>Ingresos por ventas</span><span>Registros de demostración</span></div>
+              </section>
+
+              <section class="panel stock-panel">
+                <div class="panel-heading">
+                  <div><div class="section-kicker">ESTADO ACTUAL</div><h2>Salud del inventario</h2></div>
+                  <button class="more-button" type="button" aria-label="Ver inventario" data-go-view="inventario">↗</button>
+                </div>
+                <div class="stock-health">
+                  <div class="health-ring" id="health-ring"><div><strong id="health-percent">0%</strong><span>saludable</span></div></div>
+                  <div class="health-legend">
+                    <div><span class="legend-dot healthy-dot"></span><span>En nivel óptimo</span><strong id="health-optimal">0</strong></div>
+                    <div><span class="legend-dot low-dot"></span><span>Stock bajo</span><strong id="health-low">0</strong></div>
+                    <div><span class="legend-dot out-dot"></span><span>Agotado</span><strong id="health-out">0</strong></div>
+                  </div>
+                </div>
+                <div class="reorder-callout"><span class="callout-icon">↗</span><span id="reorder-copy">Los mínimos de stock se basan en el ritmo de operación demo.</span></div>
+              </section>
+            </div>
+
+            <section class="panel table-panel">
+              <div class="panel-heading table-heading">
+                <div><div class="section-kicker">SEGUIMIENTO</div><h2>Artículos que necesitan atención</h2></div>
+                <button class="inline-link" type="button" data-go-view="inventario">Ver inventario completo <span aria-hidden="true">→</span></button>
+              </div>
+              <div class="table-scroll"><table><thead><tr><th>ARTÍCULO</th><th>SKU</th><th>DISPONIBLE</th><th>MÍNIMO</th><th>COSTO UNITARIO</th><th>ESTADO</th></tr></thead><tbody id="attention-rows"></tbody></table></div>
+              <div class="empty-state compact-empty" id="attention-empty" hidden><span class="empty-check">✓</span><span>Todo en nivel óptimo. No hay reposiciones pendientes.</span></div>
+            </section>
+            <div class="source-note"><span class="source-dot"></span>Datos de demostración · CLP nominales · guardado local en SQLite.</div>
+          </section>
+
+          <section class="view" id="view-inventario" data-view-panel="inventario" hidden>
+            <div class="page-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span>CATÁLOGO</div><h1>Inventario<span class="title-period">.</span></h1><p class="page-subtitle">Existencias actuales, costo de adquisición y margen potencial por artículo.</p></div>
+              <div class="heading-actions"><button class="button button-light" type="button" data-action="export">↓ Exportar CSV</button><button class="button button-dark" type="button" data-action="new-item"><span class="button-plus">＋</span> Nuevo artículo</button></div>
+            </div>
+            <div class="inventory-summary" id="inventory-summary"></div>
+            <section class="panel table-panel inventory-table-panel">
+              <div class="toolbar">
+                <label class="search-box"><span aria-hidden="true">⌕</span><input id="inventory-search" type="search" placeholder="Buscar por nombre o SKU" autocomplete="off"></label>
+                <div class="toolbar-filters">
+                  <label class="filter-select"><span class="sr-only">Filtrar por categoría</span><select id="category-filter"><option value="">Todas las categorías</option></select></label>
+                  <label class="filter-select"><span class="sr-only">Filtrar por estado</span><select id="status-filter"><option value="">Todos los estados</option><option value="attention">Requiere atención</option><option value="normal">En nivel óptimo</option><option value="low">Stock bajo</option><option value="out">Agotado</option></select></label>
+                  <label class="filter-select"><span class="sr-only">Filtrar artículos archivados</span><select id="archive-filter"><option value="active">Activos</option><option value="archived">Archivados</option><option value="all">Todos</option></select></label>
+                </div>
+              </div>
+              <div class="table-scroll"><table><thead><tr><th>ARTÍCULO</th><th>SKU</th><th>CATEGORÍA</th><th>DISPONIBLE</th><th>COSTO / UNIDAD</th><th>PRECIO DE VENTA</th><th>VALOR EN STOCK</th><th>MARGEN</th><th>ACCIONES</th></tr></thead><tbody id="inventory-rows"></tbody></table></div>
+              <div class="empty-state" id="inventory-empty" hidden><span class="empty-icon">⌕</span><strong>No hay resultados</strong><span>Prueba con otro término o limpia los filtros.</span></div>
+              <div class="table-foot"><span id="inventory-count">0 artículos</span><span>Valor en stock = unidades disponibles × costo unitario</span></div>
+              <div class="pagination-actions"><button class="button button-light" id="inventory-load-more" type="button" data-action="inventory-more" hidden>Ver más artículos</button></div>
+            </section>
+            <div class="source-note"><span class="source-dot"></span>El margen mostrado es potencial: precio de venta menos costo unitario, sin gastos operativos ni impuestos.</div>
+          </section>
+
+          <section class="view" id="view-movimientos" data-view-panel="movimientos" hidden>
+            <div class="page-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span>TRAZABILIDAD</div><h1>Movimientos<span class="title-period">.</span></h1><p class="page-subtitle">Entradas, ventas y ajustes que explican cada cambio en tus existencias.</p></div>
+              <div class="heading-actions"><button class="button button-dark" type="button" data-action="new-movement"><span class="button-plus">＋</span> Registrar movimiento</button></div>
+            </div>
+            <div class="movement-summary" id="movement-summary"></div>
+            <section class="panel table-panel">
+              <div class="toolbar movement-toolbar">
+                <div class="toolbar-title"><div class="section-kicker">REGISTRO DE ACTIVIDAD</div><h2>Historial de movimientos</h2></div>
+                <label class="filter-select"><span class="sr-only">Filtrar movimientos por tipo</span><select id="movement-filter"><option value="">Todos los movimientos</option><option value="Compra">Entradas por compra</option><option value="Venta">Ventas / salidas</option><option value="Ajuste">Ajustes manuales</option></select></label>
+              </div>
+              <div class="table-scroll"><table><thead><tr><th>FECHA</th><th>MOVIMIENTO</th><th>ARTÍCULO</th><th>SKU</th><th>CANTIDAD</th><th>VALOR DEL MOVIMIENTO</th><th>DETALLE</th></tr></thead><tbody id="movement-rows"></tbody></table></div>
+              <div class="empty-state" id="movement-empty" hidden><span class="empty-icon">⇄</span><strong>No hay movimientos</strong><span>Registra una compra, una venta o un ajuste para empezar.</span></div>
+              <div class="table-foot"><span id="movement-count">0 movimientos</span><span>Las ventas descuentan stock; las compras lo aumentan.</span></div>
+              <div class="pagination-actions"><button class="button button-light" id="movement-load-more" type="button" data-action="movement-more" hidden>Ver más movimientos</button></div>
+            </section>
+            <div class="source-note"><span class="source-dot"></span>El historial y las existencias se actualizan juntos; los datos de ejemplo incluyen un saldo inicial.</div>
+          </section>
+
+          <section class="view" id="view-economia" data-view-panel="economia" hidden>
+            <div class="page-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span>MODELO DE NEGOCIO</div><h1>Economía<span class="title-period">.</span></h1><p class="page-subtitle">Explora costos operativos, margen por cliente y el punto de equilibrio del software.</p></div>
+              <div class="heading-actions"><a class="button button-light" href="INFORME_ECONOMICO.md" target="_blank" rel="noreferrer">Leer informe completo <span aria-hidden="true">↗</span></a></div>
+            </div>
+            <div class="economy-banner"><div><span class="banner-kicker">SIMULADOR DE ESCENARIO</span><h2>¿Cuándo alcanza el equilibrio?</h2><p>Ajusta los supuestos para ver cómo cambia la economía mensual del producto.</p></div><span class="banner-symbol" aria-hidden="true">↗</span></div>
+            <div class="economy-layout">
+              <section class="panel assumptions-panel">
+                <div class="panel-heading"><div><div class="section-kicker">SUPUESTOS EDITABLES</div><h2>Modelo mensual</h2></div><span class="assumption-tag">CLP · sin IVA</span></div>
+                <div class="assumption-fields">
+                  <label class="field"><span>Precio mensual por cliente</span><span class="input-prefix">$<input type="number" min="0" step="1000" id="assumption-price"></span></label>
+                  <label class="field"><span>Costos fijos al mes</span><span class="input-prefix">$<input type="number" min="0" step="50000" id="assumption-fixed"></span></label>
+                  <label class="field"><span>Costo variable por cliente</span><span class="input-prefix">$<input type="number" min="0" step="500" id="assumption-variable"></span></label>
+                  <label class="field"><span>Inversión inicial estimada</span><span class="input-prefix">$<input type="number" min="0" step="500000" id="assumption-investment"></span></label>
+                </div>
+                <div class="assumption-foot"><span class="info-mark">i</span>Los campos se guardan en SQLite local. Las cifras son supuestos, no una cotización.</div>
+              </section>
+              <section class="panel breakeven-panel">
+                <div class="panel-heading"><div><div class="section-kicker">RESULTADO DEL MODELO</div><h2>Equilibrio y retorno</h2></div></div>
+                <div class="break-even-number"><strong id="break-even-clients">0</strong><span>clientes para cubrir costos fijos / mes</span></div>
+                <div class="breakeven-track" id="breakeven-track"><span></span><i></i></div>
+                <div class="breakeven-ends"><span>0 clientes</span><span id="breakeven-end">100 clientes</span></div>
+                <div class="economy-results">
+                  <div><span>Contribución / cliente</span><strong id="contribution-value">$0</strong></div>
+                  <div><span>Resultado con 100 clientes</span><strong id="profit-at-100">$0</strong></div>
+                  <div><span>Meses de recuperación* </span><strong id="payback-months">—</strong></div>
+                </div>
+                <p class="payback-note">*Payback simple a 100 clientes estables; no incluye crecimiento ni costo financiero.</p>
+              </section>
+            </div>
+            <div class="scenario-grid" id="scenario-cards"></div>
+            <div class="economy-footnote"><strong>Alcance:</strong> la simulación excluye IVA, impuesto a la renta, costo de adquisición de clientes, churn, deuda y capital de trabajo. Consulta el <a href="INFORME_ECONOMICO.md" target="_blank" rel="noreferrer">informe de costos y ROI</a> para metodología, escenarios y límites.</div>
+            <div class="source-note"><span class="source-dot"></span>Estimación conceptual para una demo en Chile · moneda: pesos chilenos (CLP).</div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="mobile-overlay" id="mobile-overlay" hidden></div>
+    <dialog class="form-dialog" id="item-dialog" aria-labelledby="item-dialog-title">
+      <form id="item-form">
+        <div class="dialog-heading"><div><div class="section-kicker">CATÁLOGO</div><h2 id="item-dialog-title">Nuevo artículo</h2></div><button type="button" class="dialog-close" aria-label="Cerrar" data-action="close-dialog">×</button></div>
+        <div class="form-grid">
+          <label class="field field-wide"><span>Nombre del artículo <i>*</i></span><input name="name" required maxlength="70" placeholder="Ej. Café de especialidad"></label>
+          <label class="field"><span>SKU <i>*</i></span><input name="sku" required maxlength="24" placeholder="CAF-001"></label>
+          <label class="field"><span>Categoría <i>*</i></span><input name="category" required maxlength="36" placeholder="Ej. Insumos"></label>
+          <label class="field"><span>Proveedor</span><input name="supplier" maxlength="50" placeholder="Nombre del proveedor"></label>
+          <label class="field"><span>Unidad <i>*</i></span><input name="unit" required maxlength="18" value="unidad"></label>
+          <label class="field" id="stock-initial-field"><span>Stock inicial <i>*</i></span><input name="quantity" type="number" required min="0" step="1" value="0"></label>
+          <label class="field"><span>Stock mínimo <i>*</i></span><input name="minimum" type="number" required min="0" step="1" value="5"></label>
+          <label class="field"><span>Costo unitario (CLP) <i>*</i></span><span class="input-prefix">$<input name="cost" type="number" required min="0" step="1" placeholder="0"></span></label>
+          <label class="field"><span>Precio de venta (CLP) <i>*</i></span><span class="input-prefix">$<input name="price" type="number" required min="0" step="1" placeholder="0"></span></label>
+        </div>
+        <div class="dialog-footer"><span><i>*</i> Campos obligatorios</span><button type="button" class="button button-light" data-action="close-dialog">Cancelar</button><button class="button button-dark" type="submit">Guardar artículo</button></div>
+      </form>
+    </dialog>
+
+    <dialog class="form-dialog movement-dialog" id="movement-dialog" aria-labelledby="movement-dialog-title">
+      <form id="movement-form">
+        <div class="dialog-heading"><div><div class="section-kicker">TRAZABILIDAD</div><h2 id="movement-dialog-title">Registrar movimiento</h2></div><button type="button" class="dialog-close" aria-label="Cerrar" data-action="close-dialog">×</button></div>
+        <div class="form-grid">
+          <label class="field"><span>Tipo de movimiento <i>*</i></span><select name="type" required><option value="Compra">Entrada por compra</option><option value="Venta">Venta / salida</option><option value="Ajuste">Ajuste manual</option></select></label>
+          <label class="field"><span>Artículo <i>*</i></span><select name="itemId" required id="movement-item"></select></label>
+          <label class="field"><span id="quantity-label">Cantidad <i>*</i></span><input name="quantity" id="movement-quantity" type="number" required min="1" step="1" value="1"></label>
+          <label class="field"><span>Fecha <i>*</i></span><input name="date" type="date" required></label>
+          <label class="field field-wide"><span>Referencia o nota</span><input name="note" maxlength="80" placeholder="Ej. Factura, venta mostrador, conteo cíclico…"></label>
+        </div>
+        <div class="movement-impact"><span class="impact-icon">↗</span><span>El valor del movimiento se calcula usando el costo o precio registrado para el artículo.</span></div>
+        <div class="dialog-footer"><span><i>*</i> Campos obligatorios</span><button type="button" class="button button-light" data-action="close-dialog">Cancelar</button><button class="button button-dark" type="submit">Guardar movimiento</button></div>
+      </form>
+    </dialog>
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <footer class="screen-reader-only" id="live-status" aria-live="polite"></footer>
+  </body>
+</html>
